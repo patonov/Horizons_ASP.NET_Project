@@ -5,10 +5,16 @@ using System.Diagnostics;
 
 namespace Horizons.Controllers
 {
+    [AllowAnonymous]
     public class HomeController : Controller
     {
         public IActionResult Index()
         {
+            if (User?.Identity?.IsAuthenticated ?? false)
+            { 
+                return RedirectToAction("Index", "Destination");
+            }
+
             return View();
         }
 

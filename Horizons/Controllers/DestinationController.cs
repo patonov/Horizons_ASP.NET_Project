@@ -18,9 +18,26 @@ namespace Horizons.Controllers
             _applicationDbContext = applicationDbContext;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            return View();
+            string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            IEnumerable<IndexDestinationViewModel> model = await _applicationDbContext.Destinations
+                .Include(d => d.Terrain)
+                .Include(d => d.UsersDestinations)
+                .Select(d => new IndexDestinationViewModel
+                { 
+                    Id = d.Id,
+                    Name = d.Name,
+                    ImageUrl = d.ImageUrl,
+                    Terrain = d.Terrain.Name,
+                    FavoritesCount = d.UsersDestinations.Count,
+                    IsPublisher = userId != null && d.PublisherId == userId,
+                    IsFavorite = userId != null && d.UsersDestinations.Any(ud => ud.DestinationId == d.Id && ud.UserId == userId)
+                })
+                .ToListAsync();
+
+            return View(model);
         }
 
         [HttpGet]
