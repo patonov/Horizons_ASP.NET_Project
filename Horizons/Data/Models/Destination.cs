@@ -11,5 +11,9 @@ namespace Horizons.Data.Models
         [Required]
         [MaxLength(DestinationNameMaxLength)]
         public string Name { get; set; } = null!;
+
+        [Required]
+        [MaxLength(250)]
+        public string Description { get; set; } = null!;
     }
 }
