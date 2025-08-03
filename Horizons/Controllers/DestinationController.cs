@@ -126,6 +126,33 @@ namespace Horizons.Controllers
             return View(model);
         }
 
+        [HttpPost]
+        public async Task<IActionResult> AddToFavorites(int id)
+        {
+            string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            if (await _applicationDbContext.UsersDestinations
+                .AnyAsync(ud => ud.UserId == userId && ud.DestinationId == id))
+            {
+                return RedirectToAction("Index");
+            }
+
+            var userDestination = new UserDestination()
+            {
+                UserId = userId,
+                DestinationId = id
+            };
+
+            await _applicationDbContext.UsersDestinations.AddAsync(userDestination);
+            await _applicationDbContext.SaveChangesAsync();
+
+            return RedirectToAction("Index");
+        }
 
     }
 }
