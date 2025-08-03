@@ -99,5 +99,33 @@ namespace Horizons.Controllers
             await _applicationDbContext.SaveChangesAsync();
             return RedirectToAction("Index");
         }
+
+        [HttpGet]
+        public async Task<IActionResult> Favorites()
+        {
+            string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            IEnumerable<FavoriteDestinationViewModel> model = await _applicationDbContext
+                .UsersDestinations
+                .Where(ud => ud.UserId == userId)
+                .Include(ud => ud.Destination)
+                .Select(ud => new FavoriteDestinationViewModel 
+                { 
+                    Id = ud.DestinationId,
+                    Name = ud.Destination.Name,
+                    Terrain = ud.Destination.Terrain.Name,
+                    ImageUrl = ud.Destination.ImageUrl,
+                })
+                .ToListAsync();
+            
+            return View(model);
+        }
+
+
     }
 }
