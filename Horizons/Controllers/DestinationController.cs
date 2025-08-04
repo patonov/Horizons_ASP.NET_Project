@@ -154,5 +154,28 @@ namespace Horizons.Controllers
             return RedirectToAction("Index");
         }
 
+        [HttpPost]
+        public async Task<IActionResult> RemoveFromFavorites(int id)
+        {
+            string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            UserDestination? userDestination = await _applicationDbContext.UsersDestinations
+                .FirstOrDefaultAsync(ud => ud.UserId == userId && ud.DestinationId == id);
+            if (userDestination == null) 
+            {
+                return RedirectToAction("Favorites", "Destination");
+            }
+
+            _applicationDbContext.UsersDestinations.Remove(userDestination);
+            await _applicationDbContext.SaveChangesAsync();
+
+            return RedirectToAction("Favorites", "Destination");
+        }
+
     }
 }
