@@ -2,6 +2,7 @@
 using Horizons.Data;
 using Horizons.Data.Models;
 using Horizons.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
@@ -154,7 +155,6 @@ namespace Horizons.Controllers
             return RedirectToAction("Index");
         }
 
-        [HttpPost]
         public async Task<IActionResult> RemoveFromFavorites(int id)
         {
             string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -176,6 +176,54 @@ namespace Horizons.Controllers
 
             return RedirectToAction("Favorites", "Destination");
         }
+
+        [AllowAnonymous]
+        public async Task<IActionResult> Details(int id) 
+        {
+            string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            Destination? destination = await _applicationDbContext.Destinations
+                .Include(d => d.Terrain)
+                .Include(d => d.Publisher)
+                .FirstOrDefaultAsync(d => d.Id == id);
+            
+            if (destination == null)
+            {
+                throw new InvalidOperationException("Not found");
+            }
+
+            DetailsDestinationViewModel model = new DetailsDestinationViewModel()
+            {
+                Id = id,
+                Name = destination.Name,
+                Description = destination.Description,
+                ImageUrl = destination.ImageUrl,
+                TerrainId = destination.TerrainId,
+                Terrain = destination.Terrain.Name,
+                PublishedOn = destination.PublishedOn,
+                PublisherId = destination.PublisherId,
+                Publisher = destination.Publisher.UserName,
+                IsPublisher = destination.PublisherId == userId,
+                IsFavorite = userId != null && await _applicationDbContext.UsersDestinations
+                    .AnyAsync(ud => ud.UserId == userId && ud.DestinationId == id),
+            };
+
+            if (model == null)
+            {
+                if (User?.Identity?.IsAuthenticated == false)
+                {
+                    return RedirectToAction("Index", "Home");
+                }
+                return RedirectToAction("Index");
+            }
+
+            return View(model);
+        }
+
+
+
+
+
 
     }
 }
