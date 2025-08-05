@@ -4,7 +4,9 @@ using Horizons.Data.Models;
 using Horizons.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Security.Claims;
 using static Horizons.Common.ValidationConstants.DestinationValidationConstants;
 
@@ -24,6 +26,7 @@ namespace Horizons.Controllers
             string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
             IEnumerable<IndexDestinationViewModel> model = await _applicationDbContext.Destinations
+                .Where(d => d.IsDeleted == false)
                 .Include(d => d.Terrain)
                 .Include(d => d.UsersDestinations)
                 .Select(d => new IndexDestinationViewModel
@@ -220,10 +223,128 @@ namespace Horizons.Controllers
             return View(model);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> Edit(int id)
+        {
+            TerrainViewModel[] terrainViewModels = await _applicationDbContext.Terrains
+                .Select(t => new TerrainViewModel 
+                { 
+                    Id = t.Id,
+                    Name = t.Name,
+                }).ToArrayAsync();
 
+            EditDestinationViewModel? model = await _applicationDbContext.Destinations.Where(d => d.Id == id)
+                .Select(d => new EditDestinationViewModel
+                {
+                    Id = d.Id,
+                    Name = d.Name,
+                    Description = d.Description,
+                    PublishedOn = d.PublishedOn.ToString("yyyy-MM-dd"),
+                    ImageUrl = d.ImageUrl,
+                    TerrainId = d.TerrainId,
+                    PublisherId = d.PublisherId,
+                    Terrains = terrainViewModels
+                }).FirstOrDefaultAsync();
 
+            if (model == null) 
+            {
+                return RedirectToAction("Index");
+            }
 
+            string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
+            if (model.PublisherId != userId)
+            {
+                return RedirectToAction("Index");
+            }
+
+            return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Edit(EditDestinationViewModel model)
+        {
+            string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (model.PublisherId != userId)
+            {
+                return RedirectToAction("Index");
+            }
+
+            if (!ModelState.IsValid) 
+            { 
+                return View(model);
+            }
+
+            if (!DateTime.TryParseExact(model.PublishedOn, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, 
+                out var publishedDate))
+            {
+                throw new InvalidOperationException("Invalid date format");
+            }
+            Destination? destination = await _applicationDbContext.Destinations
+                .FirstOrDefaultAsync(d => d.Id == model.Id);
+
+            if (destination == null)
+            {
+                return View(model);
+            }
+
+            destination.Name = model.Name;
+            destination.Description = model.Description;
+            destination.ImageUrl = model.ImageUrl;
+            destination.PublishedOn = publishedDate;
+            destination.TerrainId = model.TerrainId;
+
+            await _applicationDbContext.SaveChangesAsync();
+            return RedirectToAction("Details", new { id = model.Id });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Delete(int id)
+        {
+            string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            DeleteDestinationViewModel? model = await _applicationDbContext.Destinations
+                .Where(d => d.Id == id && d.PublisherId == userId)
+                .Select(d => new DeleteDestinationViewModel 
+                { 
+                    Id = d.Id,
+                    Name = d.Name,
+                    PublisherId = d.PublisherId,
+                    Publisher = d.Publisher.UserName!,                
+                })
+                .FirstOrDefaultAsync();
+
+            if (model == null) 
+            {
+                return RedirectToAction("Index");
+            }
+            
+            return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Delete(DeleteDestinationViewModel model)
+        {
+            string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (model.PublisherId != userId) 
+            {
+                return RedirectToAction("Index");
+            }
+            
+            Destination? destination = await _applicationDbContext.Destinations
+                .FirstOrDefaultAsync(d => d.Id == model.Id);
+
+            if (destination == null) 
+            {
+                return RedirectToAction("Index");
+            }
+
+            destination.IsDeleted = true;
+            await _applicationDbContext.SaveChangesAsync();
+            return RedirectToAction("Index");
+        }
 
     }
 }
